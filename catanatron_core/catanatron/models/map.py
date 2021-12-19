@@ -96,7 +96,7 @@ class BaseMap:
     tiles, ports, and numbers (self.tiles) at random.
     """
 
-    def __init__(self):
+    def __init__(self, opt="beginner"):
         self.numbers = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
         self.port_resources = [
             # These are 2:1 ports
@@ -185,8 +185,57 @@ class BaseMap:
             (3, -2, -1): Water,
         }
 
+        if (opt == "beginner"):
+            tile_resource_list = [
+                None,
+
+                Resource.ORE,
+                Resource.WOOD,
+                Resource.ORE,
+                Resource.BRICK,
+                Resource.ORE,
+                Resource.WHEAT,
+
+                Resource.WHEAT,
+                Resource.SHEEP,
+                Resource.BRICK,
+                Resource.SHEEP,
+                Resource.BRICK,
+                Resource.WHEAT,
+                Resource.WOOD,
+                Resource.WHEAT,
+                Resource.WOOD,
+                Resource.SHEEP,
+                Resource.SHEEP,
+                Resource.WOOD,
+            ]
+            port_resource_list = [
+                None,
+                Resource.BRICK,
+                Resource.WOOD,
+                None,
+                Resource.WHEAT,
+                Resource.ORE,
+                None,
+                Resource.SHEEP,
+                None,
+            ]
+            number_list = [6, 3, 11, 9, 4, 5, 9, 12, 11, 4, 8, 10, 5, 2, 6, 3, 8, 10]
+
+            tile_resource_list.reverse()
+            port_resource_list.reverse()
+            number_list.reverse()
+        else:
+            port_resource_list = random.sample(
+                self.port_resources, len(self.port_resources)
+            )
+            tile_resource_list = random.sample(
+                self.tile_resources, len(self.tile_resources)
+            )
+            number_list = random.sample(self.numbers, len(self.numbers))
+
         # (coordinate) => Tile (with nodes and edges initialized)
-        self.tiles = initialize_board(self)
+        self.tiles = initialize_board(self, port_resource_list, tile_resource_list, number_list)
 
         # initialize auxiliary data structures for fast-lookups
         self.port_nodes = init_port_nodes(self)
@@ -252,7 +301,7 @@ class EdgeRef(Enum):
     NORTHEAST = "NORTHEAST"
 
 
-def initialize_board(catan_map) -> Dict[Tuple[int, int, int], Tile]:
+def initialize_board(catan_map, port_resource_list, tile_resource_list, number_list) -> Dict[Tuple[int, int, int], Tile]:
     """Initializes a new random board, based on the catan_map template.
 
     It first shuffles tiles, ports, and numbers. Then goes satisfying the
@@ -268,13 +317,6 @@ def initialize_board(catan_map) -> Dict[Tuple[int, int, int], Tile]:
     Returns:
         Dict[tuple[int, int, int], Tile]: Coordinate to initialized Tile mapping.
     """
-    shuffled_port_resources = random.sample(
-        catan_map.port_resources, len(catan_map.port_resources)
-    )
-    shuffled_tile_resources = random.sample(
-        catan_map.tile_resources, len(catan_map.tile_resources)
-    )
-    shuffled_numbers = random.sample(catan_map.numbers, len(catan_map.numbers))
 
     # for each topology entry, place a tile. keep track of nodes and edges
     all_tiles = {}
@@ -290,14 +332,14 @@ def initialize_board(catan_map) -> Dict[Tuple[int, int, int], Tile]:
         if isinstance(tile_type, tuple):  # is port
             (_, direction) = tile_type
             port = Port(
-                port_autoinc, shuffled_port_resources.pop(), direction, nodes, edges
+                port_autoinc, port_resource_list.pop(), direction, nodes, edges
             )
             all_tiles[coordinate] = port
             port_autoinc += 1
         elif tile_type == Tile:
-            resource = shuffled_tile_resources.pop()
+            resource = tile_resource_list.pop()
             if resource != None:
-                number = shuffled_numbers.pop()
+                number = number_list.pop()
                 tile = Tile(tile_autoinc, resource, number, nodes, edges)
             else:
                 tile = Tile(tile_autoinc, None, None, nodes, edges)  # desert

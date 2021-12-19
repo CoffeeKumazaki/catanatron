@@ -10,6 +10,8 @@ from catanatron_experimental.machine_learning.players.minimax import (
     AlphaBetaPlayer,
     ValueFunctionPlayer,
 )
+from catanatron.models.map import BaseMap
+
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -30,7 +32,8 @@ def post_game_endpoint():
     player_keys = request.json["players"]
     players = list(map(player_factory, zip(player_keys, Color)))
 
-    game = Game(players=players)
+    camap = BaseMap("beginner")
+    game = Game(players=players, catan_map=camap)
     upsert_game_state(game)
     return jsonify({"game_id": game.id})
 
