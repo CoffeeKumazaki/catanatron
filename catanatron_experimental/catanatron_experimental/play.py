@@ -41,6 +41,7 @@ from catanatron_experimental.machine_learning.players.online_mcts_dqn import (
 )
 from catanatron_gym.features import create_sample
 from catanatron_experimental.dqn_player import DQNPlayer
+from catanatron_experimental.my_dqn_player import MyDQNPlayer
 from catanatron_experimental.machine_learning.board_tensor_features import (
     create_board_tensor,
 )
@@ -51,6 +52,7 @@ from catanatron_experimental.machine_learning.utils import (
     populate_matrices,
     DISCOUNT_FACTOR,
 )
+from catanatron.models.map import BaseMap
 
 # Create a logger object.
 logger = logging.getLogger(__name__)
@@ -91,6 +93,7 @@ PLAYER_CLASSES = {
     "P": PRLPlayer,
     "T": TensorRLPlayer,
     "D": DQNPlayer,
+    "M": MyDQNPlayer,
 }
 
 
@@ -104,6 +107,12 @@ PLAYER_CLASSES = {
         (e.g. --players=R,G:25,AB:2:C,W).\n
         {", ".join(map(lambda e: f"{e[0]}={e[1].__name__}", PLAYER_CLASSES.items()))}
         """,
+)
+@click.option(
+    "-s",
+    "--stage",
+    default="random",
+    help="Board settinngs. Values: random, beginner",
 )
 @click.option(
     "-o",
@@ -131,7 +140,7 @@ PLAYER_CLASSES = {
     default="DEBUG",
     help="Controls verbosity. Values: DEBUG, INFO, ERROR",
 )
-def simulate(num, players, outpath, save_in_db, watch, loglevel):
+def simulate(num, players, stage, outpath, save_in_db, watch, loglevel):
     """Simple program simulates NUM Catan games."""
     player_keys = players.split(",")
 
@@ -143,11 +152,11 @@ def simulate(num, players, outpath, save_in_db, watch, loglevel):
                 params = [colors[i]] + key.split(":")[1:]
                 initialized_players.append(player_class(*params))
 
-    play_batch(num, initialized_players, outpath, save_in_db, watch, loglevel)
+    play_batch(num, initialized_players, stage, outpath, save_in_db, watch, loglevel)
 
 
 def play_batch(
-    num_games, players, games_directory, save_in_db, watch, loglevel="DEBUG"
+    num_games, players, stage, games_directory, save_in_db, watch, loglevel="DEBUG"
 ):
     """Plays num_games, saves final game in database, and populates data/ matrices"""
     logger.setLevel(loglevel)
@@ -163,7 +172,9 @@ def play_batch(
     for i in range(num_games):
         for player in players:
             player.reset_state()
-        game = Game(players)
+        
+        camap = BaseMap(stage)
+        game = Game(players, catan_map=camap)
 
         logger.debug(
             f"Playing game {i + 1} / {num_games}. Seating: {game.state.players}"

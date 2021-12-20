@@ -38,6 +38,7 @@ from catanatron_gym.envs.catanatron_env import (
     ACTIONS_ARRAY,
     ACTION_SPACE_SIZE,
 )
+from catanatron.models.map import BaseMap
 
 
 FEATURES = get_feature_ordering(2)
@@ -106,8 +107,9 @@ class CatanEnvironment:
 
     def reset(self):
         p0 = Player(Color.BLUE)
+        camap = BaseMap("beginner")
         players = [p0, VictoryPointPlayer(Color.RED)]
-        game = Game(players=players)
+        game = Game(players=players, catan_map=camap)
         self.game = game
         self.p0 = p0
 
@@ -162,7 +164,7 @@ class CatanEnvironment:
 
 
 # Agent class
-class DQNAgent:
+class MyDQNAgent:
     def __init__(self):
         # Main model
         self.model = self.create_model()
@@ -307,15 +309,15 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
 
 DNQ_MODEL = None
 
-class DQNPlayer(Player):
+class MyDQNPlayer(Player):
     def __init__(self, color, model_path):
-        super(DQNPlayer, self).__init__(color)
+        super(MyDQNPlayer, self).__init__(color)
         self.model_path = model_path
         global DNQ_MODEL
         if (len(model_path) > 0):
           DNQ_MODEL = tf.keras.models.load_model(model_path)
         else:
-          DNQ_MODEL = DQNAgent().create_model()
+          DNQ_MODEL = MyDQNAgent().create_model()
 
     def decide(self, game, playable_actions):
         # 選択肢がひとつのときはそれをする
@@ -353,7 +355,7 @@ def main(experiment_name):
     if not os.path.isdir(models_folder):
         os.makedirs(models_folder)
 
-    agent = DQNAgent()
+    agent = MyDQNAgent()
     metrics_path = f"data/logs/catan-dql/{model_name}"
     output_model_path = models_folder + model_name
     writer = tf.summary.create_file_writer(metrics_path)
