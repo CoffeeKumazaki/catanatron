@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 
+import gzip
 from catanatron.state import player_key
 
 DISCOUNT_FACTOR = 0.99
@@ -67,11 +68,16 @@ def generate_arrays_from_file(
     samples_path, board_tensors_path, actions_path, rewards_path = get_matrices_path(
         games_directory
     )
+    print(samples_path)
+    print(actions_path)
+    print(rewards_path)
     while True:
-        with open(samples_path) as s, open(actions_path) as a, open(rewards_path) as r:
+        with gzip.open(samples_path, mode='rt') as s, gzip.open(actions_path, mode='rt') as a, gzip.open(rewards_path, mode='rt') as r:
             next(s)  # skip header
             next(a)  # skip header
             rewards_header = next(r)  # skip header
+            print(rewards_header)
+            print(label_column)
             label_index = rewards_header.rstrip().split(",").index(label_column)
             for i, sline in enumerate(s):
                 try:

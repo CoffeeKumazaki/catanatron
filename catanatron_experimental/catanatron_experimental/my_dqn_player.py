@@ -40,6 +40,10 @@ from catanatron_gym.envs.catanatron_env import (
 )
 from catanatron.models.map import BaseMap
 
+from catanatron_experimental.machine_learning.utils import (
+  generate_arrays_from_file,
+  estimate_num_samples,
+)
 
 FEATURES = get_feature_ordering(2)
 NUM_FEATURES = len(FEATURES)
@@ -334,15 +338,103 @@ class MyDQNPlayer(Player):
         return best_action
 
 
+def self_learning(agent, metrix_writer):
+ 
+  global epsilon
+  env = CatanEnvironment()
+
+  # For stats
+  ep_rewards = []
+
+  for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit="episodes"):
+
+    # Restarting episode - reset episode reward and step number
+    episode_reward = 0
+    step = 1
+
+    # Reset environment and get initial state
+    current_state = env.reset()
+
+    # Reset flag and start iterating until episode ends
+    done = False
+    while not done:
+        best_action_int = epsilon_greedy_policy(
+            env.playable_actions(), agent.get_qs(current_state), epsilon
+        )
+        new_state, reward, done = env.step(best_action_int)
+
+        # Transform new continous state to new discrete state and count reward
+        episode_reward += reward
+
+        if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
+            env.render()
+
+        # 行動をバッファに登録
+        # 選択肢がないときは学習しなくていい
+        if len(env.playable_actions()) > 1:
+          agent.update_replay_memory(
+              (current_state, best_action_int, reward, new_state, done)
+          )
+
+        if step % TRAIN_EVERY_N_STEPS == 0:
+            agent.train(done)
+
+        current_state = new_state
+        step += 1
+    if step % TRAIN_EVERY_N_EPISODES == 0:
+        agent.train(done)
+
+    # Append episode reward to a list and log stats (every given number of episodes)
+    ep_rewards.append(episode_reward)
+    if episode % AGGREGATE_STATS_EVERY == 0:
+        average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(
+            ep_rewards[-AGGREGATE_STATS_EVERY:]
+        )
+        with metrix_writer.as_default():
+            tf.summary.scalar("avg-reward", average_reward, step=episode)
+            tf.summary.scalar("epsilon", epsilon, step=episode)
+            metrix_writer.flush()
+
+    # Decay epsilon
+    if epsilon > MIN_EPSILON:
+        epsilon *= EPSILON_DECAY
+        epsilon = max(MIN_EPSILON, epsilon)
+
+  return agent
+
+def teacher_learning(agent, writer, play_data, validation_step):
+
+  num_samples = estimate_num_samples(play_data)
+  print("Number of samples =", num_samples)
+  agent.model.fit(
+    generate_arrays_from_file(play_data, MINIBATCH_SIZE, "VICTORY_POINTS_RETURN", "Q"),
+    epochs=1,
+    steps_per_epoch = num_samples / MINIBATCH_SIZE,
+  )
+
+  return agent
+
+
 @click.command()
 @click.argument("experiment_name")
-def main(experiment_name):
-    global epsilon
-
-    env = CatanEnvironment()
-
-    # For stats
-    ep_rewards = []
+@click.option(
+  "-d",
+  "--play-data",
+  default=None,
+  help="Teacher data path. if empty self-learning",
+)
+@click.option(
+  "-e",
+  "--episode",
+  default=150,
+  help="Number of episode for self-learning",
+)
+@click.option(
+  "--validation-step",
+  default=100,
+  help=""
+)
+def main(experiment_name, play_data, episode, validation_step):
 
     # For more repetitive results
     random.seed(2)
@@ -362,59 +454,12 @@ def main(experiment_name):
     print("Will be writing metrics to", metrics_path)
     print("Will be saving model to", output_model_path)
 
+    if (play_data):
+      agent = teacher_learning(agent, writer, play_data, validation_step)
+    else:
+      agent = self_learning(agent, writer)
     # Iterate over episodes
-    for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit="episodes"):
-        # Restarting episode - reset episode reward and step number
-        episode_reward = 0
-        step = 1
 
-        # Reset environment and get initial state
-        current_state = env.reset()
-
-        # Reset flag and start iterating until episode ends
-        done = False
-        while not done:
-            best_action_int = epsilon_greedy_policy(
-                env.playable_actions(), agent.get_qs(current_state), epsilon
-            )
-            new_state, reward, done = env.step(best_action_int)
-
-            # Transform new continous state to new discrete state and count reward
-            episode_reward += reward
-
-            if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
-                env.render()
-
-            # 行動をバッファに登録
-            # 選択肢がないときは学習しなくていい
-            if len(env.playable_actions()) > 1:
-              agent.update_replay_memory(
-                  (current_state, best_action_int, reward, new_state, done)
-              )
-
-            if step % TRAIN_EVERY_N_STEPS == 0:
-                agent.train(done)
-
-            current_state = new_state
-            step += 1
-        if step % TRAIN_EVERY_N_EPISODES == 0:
-            agent.train(done)
-
-        # Append episode reward to a list and log stats (every given number of episodes)
-        ep_rewards.append(episode_reward)
-        if episode % AGGREGATE_STATS_EVERY == 0:
-            average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(
-                ep_rewards[-AGGREGATE_STATS_EVERY:]
-            )
-            with writer.as_default():
-                tf.summary.scalar("avg-reward", average_reward, step=episode)
-                tf.summary.scalar("epsilon", epsilon, step=episode)
-                writer.flush()
-
-        # Decay epsilon
-        if epsilon > MIN_EPSILON:
-            epsilon *= EPSILON_DECAY
-            epsilon = max(MIN_EPSILON, epsilon)
 
     print("Saving model to", output_model_path)
     agent.model.save(output_model_path)
