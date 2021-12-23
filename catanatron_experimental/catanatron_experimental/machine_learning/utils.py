@@ -76,8 +76,6 @@ def generate_arrays_from_file(
             next(s)  # skip header
             next(a)  # skip header
             rewards_header = next(r)  # skip header
-            print(rewards_header)
-            print(label_column)
             label_index = rewards_header.rstrip().split(",").index(label_column)
             for i, sline in enumerate(s):
                 try:

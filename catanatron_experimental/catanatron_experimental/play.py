@@ -41,7 +41,8 @@ from catanatron_experimental.machine_learning.players.online_mcts_dqn import (
 )
 from catanatron_gym.features import create_sample
 from catanatron_experimental.dqn_player import DQNPlayer
-from catanatron_experimental.my_dqn_player import MyDQNPlayer
+from catanatron_experimental.rlas2021.my_dqn_player import MyDQNPlayer
+from catanatron_experimental.rlas2021.play_logging import generate_log_callback
 from catanatron_experimental.machine_learning.board_tensor_features import (
     create_board_tensor,
 )
@@ -181,7 +182,8 @@ def play_batch(
         )
         action_callbacks = []
         if games_directory:
-            action_callbacks.append(build_action_callback(games_directory))
+            # action_callbacks.append(build_action_callback(games_directory))
+            action_callbacks.append(generate_log_callback(games_directory))
         if watch:
             with database_session() as session:
                 upsert_game_state(game, session)

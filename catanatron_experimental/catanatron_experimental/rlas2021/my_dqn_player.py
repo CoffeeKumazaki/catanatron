@@ -47,6 +47,7 @@ from catanatron_experimental.machine_learning.utils import (
 
 FEATURES = get_feature_ordering(2)
 NUM_FEATURES = len(FEATURES)
+print("NUM_FEATURES: ", NUM_FEATURES)
 
 DISCOUNT = 0.9
 
@@ -406,8 +407,9 @@ def teacher_learning(agent, writer, play_data, validation_step):
 
   num_samples = estimate_num_samples(play_data)
   print("Number of samples =", num_samples)
+
   agent.model.fit(
-    generate_arrays_from_file(play_data, MINIBATCH_SIZE, "VICTORY_POINTS_RETURN", "Q"),
+    generate_arrays_from_file(play_data, MINIBATCH_SIZE, "VICTORY_POINTS_RETURN", "P"),
     epochs=1,
     steps_per_epoch = num_samples / MINIBATCH_SIZE,
   )
@@ -437,9 +439,9 @@ def teacher_learning(agent, writer, play_data, validation_step):
 def main(experiment_name, play_data, episode, validation_step):
 
     # For more repetitive results
-    random.seed(2)
-    np.random.seed(2)
-    tf.random.set_seed(2)
+    random.seed(4)
+    np.random.seed(4)
+    tf.random.set_seed(4)
 
     # Ensure models folder
     model_name = f"{experiment_name}-{int(time.time())}"
@@ -448,6 +450,7 @@ def main(experiment_name, play_data, episode, validation_step):
         os.makedirs(models_folder)
 
     agent = MyDQNAgent()
+    agent.model.summary()
     metrics_path = f"data/logs/catan-dql/{model_name}"
     output_model_path = models_folder + model_name
     writer = tf.summary.create_file_writer(metrics_path)
