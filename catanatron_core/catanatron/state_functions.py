@@ -36,6 +36,9 @@ def mantain_largets_army(state, color, previous_army_color, previous_army_size):
             state.player_state[f"{winner_key}_HAS_ARMY"] = True
             state.player_state[f"{winner_key}_VICTORY_POINTS"] += 2
             state.player_state[f"{winner_key}_ACTUAL_VICTORY_POINTS"] += 2
+        elif color == previous_army_color:
+            # do nothing.
+            pass 
         elif previous_army_size < candidate_size:
             # switch, remove previous points and award to new king
             winner_key = player_key(state, color)
