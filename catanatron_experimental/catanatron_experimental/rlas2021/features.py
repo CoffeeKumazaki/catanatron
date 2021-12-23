@@ -31,7 +31,7 @@ def player_features(game: Game, p_color):
       ]
       
       ## 使用済騎士数
-      features["PLAYED_KNIGHT"] = game.state.player_state[f"P{i}_PLAYED_KNIGHT"]
+      features["PLAYED_KNIGHT"] = game.state.player_state[key+"_PLAYED_KNIGHT"]
       break
 
   return features
