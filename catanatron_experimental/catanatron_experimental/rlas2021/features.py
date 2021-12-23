@@ -63,8 +63,8 @@ def board_features(game: Game, p_color):
   ## initialize
   for i in range(len(game.state.colors)):
     for node_id in range(NUM_NODES):
+      features[f"NODE{node_id}_EMPTY"] = True
       for building in [BuildingType.SETTLEMENT, BuildingType.CITY]:
-        features[f"NODE{node_id}_{building.value}_E"] = True
         features[f"NODE{node_id}_{building.value}_P"] = False
         features[f"NODE{node_id}_{building.value}_O"] = False
     for edge in get_edges():
@@ -83,10 +83,12 @@ def board_features(game: Game, p_color):
     roads = tuple(game.state.buildings_by_color[color][BuildingType.ROAD])
 
     for node_id in settlements:
-      features[f"NODE{node_id}_SETTLEMENT_E"] = False
+      features[f"NODE{node_id}_EMPTY"] = False
       features[f"NODE{node_id}_SETTLEMENT_{key}"] = True
+      features[f"NODE{node_id}_CITY_{key}"] = False
     for node_id in cities:
-      features[f"NODE{node_id}_CITY_E"] = False
+      features[f"NODE{node_id}_EMPTY"] = False
+      features[f"NODE{node_id}_SETTLEMENT_{key}"] = False
       features[f"NODE{node_id}_CITY_{key}"] = True
     for edge in roads:
       features[f"EDGE{tuple(sorted(edge))}_ROAD_E"] = False
