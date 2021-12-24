@@ -297,7 +297,6 @@ def apply_action(state: State, action: Action):
         drawVoctoryPointCard = False
         for dev_card in state.dev_reserve[next_player_key]:
             state.player_state[f"{next_player_key}_{dev_card}_IN_HAND"] += 1
-            print(state.num_turns, next_player_key, dev_card)
             if (dev_card == "VICTORY_POINT"):
                 drawVoctoryPointCard = True
         state.dev_reserve[next_player_key] = []
