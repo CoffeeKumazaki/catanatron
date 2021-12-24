@@ -39,6 +39,7 @@ def generate_log_callback(play_log_directory):
     record.player = action.color
     record.status = extract_status(game, action.color)
     record.action = extract_actions(game, action)
+    record.reward["Game"] = str(game.id)
     record.reward["PLAYER"]   = action.color
     record.reward["RETURN"]   = get_discounted_return(game, action.color, 1)
     record.reward["DRETURN"]  = get_discounted_return(game, action.color, DISCOUNT_FACTOR)

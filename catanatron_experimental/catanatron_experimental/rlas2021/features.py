@@ -107,6 +107,7 @@ feature_extractors = [
 
 def extract_status(game: Game, actor_color):
   record = {}
+  record["Game"] = str(game.id)
   for extractor in feature_extractors:
     record.update(extractor(game, actor_color))
   return record
@@ -114,13 +115,14 @@ def extract_status(game: Game, actor_color):
 prev_playable_actions = 50
 def extract_actions(game: Game, action: Action):
   record = {}
+  record["Game"] = str(game.id)
   record["Player"] = str(action.color)
   record["Action"] = str(action.action_type)
   if action.value is not None:
     record["Action"] += str(action.value)
   global prev_playable_actions
   record["NumAction"] = prev_playable_actions
-  record["Action Cand"] = game.state.playable_actions
+  # record["Action Cand"] = game.state.playable_actions
   prev_playable_actions = len(game.state.playable_actions)
   
   return record
