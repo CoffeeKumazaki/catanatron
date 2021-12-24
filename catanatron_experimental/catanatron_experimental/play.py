@@ -245,9 +245,9 @@ def play_batch(
                         )
                 writer.flush()
 
-    logger.info(f"AVG Ticks: {sum(ticks) / len(ticks)}")
-    logger.info(f"AVG Turns: {sum(turns) / len(turns)}")
-    logger.info(f"AVG Duration: {sum(durations) / len(durations)}")
+    logger.info(f"AVG Ticks: {sum(ticks) / len(ticks)} actions")
+    logger.info(f"AVG Turns: {sum(turns) / len(turns)} turnes")
+    logger.info(f"AVG Duration: {sum(durations) / len(durations)} sec")
 
     for player in players:
         vps = results_by_player[player.color]
