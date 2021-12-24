@@ -192,6 +192,8 @@ class State:
         state_copy.free_roads_available = self.free_roads_available
 
         state_copy.playable_actions = self.playable_actions
+        state_copy.dev_reserve = self.dev_reserve
+
         return state_copy
 
 
