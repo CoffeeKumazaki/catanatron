@@ -204,7 +204,7 @@ def buy_dev_card(state, color, dev_card):
     assert state.player_state[f"{key}_WHEAT_IN_HAND"] >= 1
     assert state.player_state[f"{key}_ORE_IN_HAND"] >= 1
 
-    state.player_state[f"{key}_{dev_card}_IN_HAND"] += 1
+    state.dev_reserve[key].append(dev_card)
     state.player_state[f"{key}_SHEEP_IN_HAND"] -= 1
     state.player_state[f"{key}_WHEAT_IN_HAND"] -= 1
     state.player_state[f"{key}_ORE_IN_HAND"] -= 1

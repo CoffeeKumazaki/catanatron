@@ -144,6 +144,10 @@ class State:
             self.free_roads_available = 0
 
             self.playable_actions = generate_playable_actions(self)
+            self.dev_reserve = {}
+            for c in self.colors:
+                pkey = player_key(self, c)
+                self.dev_reserve[pkey] = []
 
     def current_player(self):
         """Helper for accessing Player instance who should decide next"""
@@ -287,7 +291,21 @@ def apply_action(state: State, action: Action):
         player_clean_turn(state, action.color)
         advance_turn(state)
         state.current_prompt = ActionPrompt.PLAY_TURN
-        state.playable_actions = generate_playable_actions(state)
+        ## add drawn dev cards to hand
+        next_player_color = state.current_player().color
+        next_player_key = player_key(state, next_player_color)
+        drawVoctoryPointCard = False
+        for dev_card in state.dev_reserve[next_player_key]:
+            state.player_state[f"{next_player_key}_{dev_card}_IN_HAND"] += 1
+            print(state.num_turns, next_player_key, dev_card)
+            if (dev_card == "VICTORY_POINT"):
+                drawVoctoryPointCard = True
+        state.dev_reserve[next_player_key] = []
+
+        if drawVoctoryPointCard:
+            state.playable_actions = [Action(next_player_color, ActionType.PLAY_VICTORY_POINT, None)]
+        else:
+            state.playable_actions = generate_playable_actions(state)
     elif action.action_type == ActionType.BUILD_SETTLEMENT:
         node_id = action.value
         if state.is_initial_build_phase:
@@ -534,6 +552,9 @@ def apply_action(state: State, action: Action):
 
         # state.current_player_index stays the same
         state.current_prompt = ActionPrompt.PLAY_TURN
+        state.playable_actions = generate_playable_actions(state)
+    elif action.action_type == ActionType.PLAY_VICTORY_POINT:
+        state.player_state[f"{player_key(state, action.color)}_ACTUAL_VICTORY_POINTS"] += 1
         state.playable_actions = generate_playable_actions(state)
     elif action.action_type == ActionType.MARITIME_TRADE:
         trade_offer = action.value
