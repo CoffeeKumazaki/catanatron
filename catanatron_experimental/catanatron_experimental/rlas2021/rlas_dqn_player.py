@@ -26,12 +26,16 @@ from selenium import webdriver
 
 from catanatron.game import Game
 from catanatron.models.player import Color, Player, RandomPlayer
+from catanatron.players.weighted_random import WeightedRandomPlayer
 from catanatron.players.search import VictoryPointPlayer
-from catanatron_gym.features import create_sample_vector, get_feature_ordering
-from catanatron_server.utils import ensure_link
-from catanatron_experimental.machine_learning.board_tensor_features import (
-    create_board_tensor,
+from catanatron_experimental.machine_learning.players.minimax import (
+    AlphaBetaPlayer,
+    ValueFunctionPlayer,
 )
+
+from catanatron_experimental.rlas2021.features import extract_status, extract_actions
+from catanatron_server.utils import ensure_link
+## TODO: action空間の設定.
 from catanatron_gym.envs.catanatron_env import (
     from_action_space,
     to_action_space,
@@ -45,9 +49,6 @@ from catanatron_experimental.machine_learning.utils import (
   estimate_num_samples,
 )
 
-FEATURES = get_feature_ordering(2)
-NUM_FEATURES = len(FEATURES)
-print("NUM_FEATURES: ", NUM_FEATURES)
 
 DISCOUNT = 0.9
 
@@ -101,24 +102,75 @@ SHOW_PREVIEW = False
 # Num Knights
 # Num Roads
 
+DQN_MODEL = None
+
+class RLASDQNPlayer(Player):
+    def __init__(self, color, model_path = ""):
+        super(RLASDQNPlayer, self).__init__(color)
+        self.model_path = model_path
+        global DQN_MODEL
+        if DQN_MODEL is None:
+            if (len(model_path) > 0):
+                DQN_MODEL = tf.keras.models.load_model(model_path)
+            else:
+                DQN_MODEL = RLASAgent().create_model()
+
+    def decide(self, game, playable_actions):
+        # 選択肢がひとつのときはそれをする
+        if len(playable_actions) == 1:
+            return playable_actions[0]
+
+        sample = create_sample_vector(game, self.color, FEATURES)
+        sample = tf.reshape(tf.convert_to_tensor(sample), (-1, NUM_FEATURES))
+        # 行動に対するQ値をもらう
+        qs = DQN_MODEL.call(sample)[0]
+
+        best_action_int = epsilon_greedy_policy(playable_actions, qs, 0.05)
+        best_action = from_action_space(best_action_int, playable_actions)
+        return best_action
+
+BOT_CLASSES = [
+    RandomPlayer,
+    WeightedRandomPlayer,
+    VictoryPointPlayer,
+    ValueFunctionPlayer,
+    AlphaBetaPlayer,
+]
 
 class CatanEnvironment:
     def __init__(self):
         self.game = None
-        self.p0 = None
+        self.dqn_players = []
 
     def playable_actions(self):
         return self.game.state.playable_actions
 
     def reset(self):
-        p0 = Player(Color.BLUE)
         camap = BaseMap("beginner")
-        players = [p0, VictoryPointPlayer(Color.RED)]
+        ## choose number of players and AI for each player randomly.
+        # DQN Player + 1-3 players
+        player_num = random.randrange(1, 4) + 1
+        dqn_player_num = random.randrange(0, player_num) + 1
+        pcolors = [c for c in Color]
+
+        ## print(f"{dqn_player_num} DQNs / {player_num} players")
+
+        # dqn player
+        players = []
+        for i in range(dqn_player_num):
+            p = Player(pcolors.pop())
+            players.append(p)
+            self.dqn_players.append(p.color)
+
+        for i in range(player_num-dqn_player_num):
+            bot_id = random.randrange(0,len(BOT_CLASSES))
+            players.append(BOT_CLASSES[bot_id](pcolors.pop()))
+
+        ## for p in players:
+        ##    print(p)
+
         game = Game(players=players, catan_map=camap)
         self.game = game
-        self.p0 = p0
-
-        self._advance_until_p0_decision()
 
         return self._get_state()
 
@@ -126,20 +178,17 @@ class CatanEnvironment:
         action = from_action_space(action_int, self.playable_actions())
         self.game.execute(action)
 
-        self._advance_until_p0_decision()
         winning_color = self.game.winning_color()
 
         new_state = self._get_state()
 
-        # key = player_key(self.game.state, self.p0.color)
-        # points = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"]
-        # reward = int(winning_color == self.p0.color) * 10 * 1000 + points
+        key = player_key(self.game.state, action.color)
+        points = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"]
+        reward = int(winning_color == self.p0.color) * 10 * 1000 + points
         if winning_color is None:
             reward = 0
-        elif winning_color == self.p0.color:
-            reward = 1
         else:
-            reward = -1
+            reward = 1
 
         done = winning_color is not None or self.game.state.num_turns > 500
         return new_state, reward, done
@@ -155,21 +204,21 @@ class CatanEnvironment:
             print("Exception closing browser. Did you close manually?")
 
     def _get_state(self):
-        sample = create_sample_vector(self.game, self.p0.color, FEATURES)
-        # board_tensor = create_board_tensor(self.game, self.p0.color)
+        current_player_color = self.game.state.current_player().color
+        sample = extract_status(self.game, current_player_color)
 
         return (sample, None)  # NOTE: each observation/state is a tuple.
 
-    def _advance_until_p0_decision(self):
+    def _advance_until_dqn_decision(self):
         while (
             self.game.winning_color() is None
-            and self.game.state.current_player().color != self.p0.color
+            and self.game.state.current_player().color not in self.dqn_players
         ):
             self.game.play_tick()  # will play bot
 
 
 # Agent class
-class MyDQNAgent:
+class RLASAgent:
     def __init__(self):
         # Main model
         self.model = self.create_model()
@@ -186,7 +235,7 @@ class MyDQNAgent:
 
     def create_model(self):
 
-        inputs = tf.keras.Input(shape=(NUM_FEATURES,))
+        inputs = tf.keras.Input(shape=(STATE_SPACE_SIZE,))
         outputs = inputs
         # outputs = normalizer_layer(outputs)
         outputs = BatchNormalization()(outputs)
@@ -311,34 +360,6 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
     return best_action_int
 
 
-
-DNQ_MODEL = None
-
-class MyDQNPlayer(Player):
-    def __init__(self, color, model_path):
-        super(MyDQNPlayer, self).__init__(color)
-        self.model_path = model_path
-        global DNQ_MODEL
-        if (len(model_path) > 0):
-          DNQ_MODEL = tf.keras.models.load_model(model_path)
-        else:
-          DNQ_MODEL = MyDQNAgent().create_model()
-
-    def decide(self, game, playable_actions):
-        # 選択肢がひとつのときはそれをする
-        if len(playable_actions) == 1:
-            return playable_actions[0]
-
-        sample = create_sample_vector(game, self.color, FEATURES)
-        sample = tf.reshape(tf.convert_to_tensor(sample), (-1, NUM_FEATURES))
-        # 行動に対するQ値をもらう
-        qs = DNQ_MODEL.call(sample)[0]
-
-        best_action_int = epsilon_greedy_policy(playable_actions, qs, 0.05)
-        best_action = from_action_space(best_action_int, playable_actions)
-        return best_action
-
-
 def self_learning(agent, metrix_writer):
  
   global epsilon
@@ -449,7 +470,7 @@ def main(experiment_name, play_data, episode, validation_step):
     if not os.path.isdir(models_folder):
         os.makedirs(models_folder)
 
-    agent = MyDQNAgent()
+    agent = RLASAgent()
     agent.model.summary()
     metrics_path = f"data/logs/catan-dql/{model_name}"
     output_model_path = models_folder + model_name
