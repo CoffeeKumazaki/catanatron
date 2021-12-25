@@ -41,7 +41,7 @@ from catanatron_experimental.machine_learning.players.online_mcts_dqn import (
 )
 from catanatron_gym.features import create_sample
 from catanatron_experimental.dqn_player import DQNPlayer
-from catanatron_experimental.rlas2021.my_dqn_player import MyDQNPlayer
+from catanatron_experimental.rlas2021.rlas_dqn_player import RLASDQNPlayer
 from catanatron_experimental.rlas2021.play_logging import generate_log_callback
 from catanatron_experimental.machine_learning.board_tensor_features import (
     create_board_tensor,
@@ -94,7 +94,7 @@ PLAYER_CLASSES = {
     "P": PRLPlayer,
     "T": TensorRLPlayer,
     "D": DQNPlayer,
-    "M": MyDQNPlayer,
+    "RLAS": RLASDQNPlayer,
 }
 
 
