@@ -3,6 +3,7 @@ from catanatron.state_functions import player_key
 from catanatron_gym.features import iter_players
 from catanatron.models.board import get_edges
 from catanatron.models.map import NUM_NODES
+from catanatron.models.player import Color, SimplePlayer
 from catanatron.models.enums import (
   DEVELOPMENT_CARDS,
   RESOURCES,
@@ -107,23 +108,31 @@ feature_extractors = [
 
 def extract_status(game: Game, actor_color):
   record = {}
-  record["Game"] = str(game.id)
   for extractor in feature_extractors:
     record.update(extractor(game, actor_color))
   return record
 
+def status_vector(game: Game, actor_color):
+  record = extract_status(game, actor_color)
+  return [float(record[k]) for k in sorted(record.keys())]
+
 prev_playable_actions = 50
 def extract_actions(game: Game, action: Action):
   record = {}
-  record["Game"] = str(game.id)
-  record["Player"] = str(action.color)
   record["Action"] = str(action.action_type)
   if action.value is not None:
     record["Action"] += str(action.value)
-  global prev_playable_actions
-  record["NumAction"] = prev_playable_actions
-  # record["Action Cand"] = game.state.playable_actions
-  prev_playable_actions = len(game.state.playable_actions)
   
   return record
-  
+
+def get_feature_size():
+
+  players = [
+      SimplePlayer(Color.RED),
+      SimplePlayer(Color.BLUE),
+      SimplePlayer(Color.WHITE),
+      SimplePlayer(Color.ORANGE),
+  ]
+  game = Game(players)
+  record = extract_status(game)
+  return len(record)
