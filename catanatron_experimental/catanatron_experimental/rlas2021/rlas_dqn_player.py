@@ -33,14 +33,17 @@ from catanatron_experimental.machine_learning.players.minimax import (
     ValueFunctionPlayer,
 )
 
-from catanatron_experimental.rlas2021.features import extract_status, extract_actions
+from catanatron_experimental.rlas2021.features import (
+    extract_status, 
+    status_vector,
+    get_feature_size,
+    extract_actions,
+)
 from catanatron_server.utils import ensure_link
-## TODO: action空間の設定.
-from catanatron_gym.envs.catanatron_env import (
-    from_action_space,
-    to_action_space,
-    ACTIONS_ARRAY,
-    ACTION_SPACE_SIZE,
+from catanatron_experimental.rlas2021.rlas_catan_env import (
+    index_to_action,
+    action_to_index,
+    get_actions_size,
 )
 from catanatron.models.map import BaseMap
 
@@ -103,30 +106,56 @@ SHOW_PREVIEW = False
 # Num Roads
 
 DQN_MODEL = None
+FEATURES_SIZE = get_feature_size()
+ACTIONS_SIZE = get_actions_size()
 
 class RLASDQNPlayer(Player):
-    def __init__(self, color, model_path = ""):
+    def __init__(self, color, model_path = None):
         super(RLASDQNPlayer, self).__init__(color)
         self.model_path = model_path
         global DQN_MODEL
         if DQN_MODEL is None:
-            if (len(model_path) > 0):
-                DQN_MODEL = tf.keras.models.load_model(model_path)
-            else:
-                DQN_MODEL = RLASAgent().create_model()
+            DQN_MODEL = self.create_model(model_path)
+
+    def create_model(self, model_path):
+        
+        model = None
+        if model_path is None:
+            inputs = tf.keras.Input(shape=(FEATURES_SIZE,))
+            outputs = inputs
+            # outputs = normalizer_layer(outputs)
+            outputs = BatchNormalization()(outputs)
+            # outputs = Dense(352, activation="relu")(outputs)
+            # outputs = Dense(256, activation="relu")(outputs)
+            outputs = Dense(64, activation="relu")(outputs)
+            outputs = Dense(32, activation="relu")(outputs)
+            outputs = Dense(units=ACTIONS_SIZE, activation="linear")(outputs)
+            model = tf.keras.Model(inputs=inputs, outputs=outputs)
+
+            model.compile(
+                loss="mse",
+                optimizer=Adam(lr=1e-5),
+                metrics=["accuracy"],
+            )
+        else:
+            model = tf.keras.models.load_model(model_path)
+
+        return model
+
 
     def decide(self, game, playable_actions):
         # 選択肢がひとつのときはそれをする
         if len(playable_actions) == 1:
             return playable_actions[0]
 
-        sample = create_sample_vector(game, self.color, FEATURES)
-        sample = tf.reshape(tf.convert_to_tensor(sample), (-1, NUM_FEATURES))
-        # 行動に対するQ値をもらう
+        # get status vector
+        sample = status_vector(game, self.color)
+        sample = tf.reshape(tf.convert_to_tensor(sample), (-1, FEATURES_SIZE))
+        # get estimated q value
         qs = DQN_MODEL.call(sample)[0]
 
         best_action_int = epsilon_greedy_policy(playable_actions, qs, 0.05)
-        best_action = from_action_space(best_action_int, playable_actions)
+        best_action = index_to_action(best_action_int, playable_actions)
         return best_action
 
 BOT_CLASSES = [
@@ -233,26 +262,6 @@ class RLASAgent:
         # Used to count when to update target network with main network's weights
         self.target_update_counter = 0
 
-    def create_model(self):
-
-        inputs = tf.keras.Input(shape=(STATE_SPACE_SIZE,))
-        outputs = inputs
-        # outputs = normalizer_layer(outputs)
-        outputs = BatchNormalization()(outputs)
-        # outputs = Dense(352, activation="relu")(outputs)
-        # outputs = Dense(256, activation="relu")(outputs)
-        outputs = Dense(64, activation="relu")(outputs)
-        outputs = Dense(32, activation="relu")(outputs)
-        outputs = Dense(units=ACTION_SPACE_SIZE, activation="linear")(outputs)
-        model = tf.keras.Model(inputs=inputs, outputs=outputs)
-
-        model.compile(
-            loss="mse",
-            optimizer=Adam(lr=1e-5),
-            metrics=["accuracy"],
-        )
-        return model
-
     # リプレイバッファへの保存
     # (state, action, reward, new state, done)
     def update_replay_memory(self, transition):
@@ -336,15 +345,15 @@ class RLASAgent:
     # 現在状態の推定Q値取得
     def get_qs(self, state):
         (sample, board_tensor) = state
-        sample = tf.reshape(tf.convert_to_tensor(sample), (-1, NUM_FEATURES))
+        sample = tf.reshape(tf.convert_to_tensor(sample), (-1, FEATURES_SIZE))
         return self.model.call(sample)[0]
 
 
 def epsilon_greedy_policy(playable_actions, qs, epsilon):
     if np.random.random() > epsilon:
-        # Create array like [0,0,1,0,0,0,1,...] representing actions in space that are playable
-        action_ints = list(map(to_action_space, playable_actions))
-        mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.int)
+        # create mask list, 1 if playable else 0
+        action_ints = list(map(action_to_index, playable_actions))
+        mask = np.zeros(ACTIONS_SIZE, dtype=np.int)
         mask[action_ints] = 1
 
         clipped_probas = np.multiply(mask, qs)
@@ -355,7 +364,7 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
         # Get random action
         index = random.randrange(0, len(playable_actions))
         best_action = playable_actions[index]
-        best_action_int = to_action_space(best_action)
+        best_action_int = action_to_index(best_action)
 
     return best_action_int
 
