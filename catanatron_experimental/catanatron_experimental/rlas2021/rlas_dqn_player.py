@@ -105,43 +105,13 @@ SHOW_PREVIEW = False
 # Num Knights
 # Num Roads
 
-DQN_MODEL = None
 FEATURES_SIZE = get_feature_size()
 ACTIONS_SIZE = get_actions_size()
 
 class RLASDQNPlayer(Player):
-    def __init__(self, color, model_path = None):
+    def __init__(self, color, model_path):
         super(RLASDQNPlayer, self).__init__(color)
-        self.model_path = model_path
-        global DQN_MODEL
-        if DQN_MODEL is None:
-            DQN_MODEL = self.create_model(model_path)
-
-    def create_model(self, model_path):
-        
-        model = None
-        if model_path is None:
-            inputs = tf.keras.Input(shape=(FEATURES_SIZE,))
-            outputs = inputs
-            # outputs = normalizer_layer(outputs)
-            outputs = BatchNormalization()(outputs)
-            # outputs = Dense(352, activation="relu")(outputs)
-            # outputs = Dense(256, activation="relu")(outputs)
-            outputs = Dense(64, activation="relu")(outputs)
-            outputs = Dense(32, activation="relu")(outputs)
-            outputs = Dense(units=ACTIONS_SIZE, activation="linear")(outputs)
-            model = tf.keras.Model(inputs=inputs, outputs=outputs)
-
-            model.compile(
-                loss="mse",
-                optimizer=Adam(lr=1e-5),
-                metrics=["accuracy"],
-            )
-        else:
-            model = tf.keras.models.load_model(model_path)
-
-        return model
-
+        self.model = model = tf.keras.models.load_model(model_path)   
 
     def decide(self, game, playable_actions):
         # 選択肢がひとつのときはそれをする
@@ -261,6 +231,27 @@ class RLASAgent:
 
         # Used to count when to update target network with main network's weights
         self.target_update_counter = 0
+
+    def create_model(self):
+        
+        inputs = tf.keras.Input(shape=(FEATURES_SIZE,))
+        outputs = inputs
+        # outputs = normalizer_layer(outputs)
+        outputs = BatchNormalization()(outputs)
+        # outputs = Dense(352, activation="relu")(outputs)
+        # outputs = Dense(256, activation="relu")(outputs)
+        outputs = Dense(64, activation="relu")(outputs)
+        outputs = Dense(32, activation="relu")(outputs)
+        outputs = Dense(units=ACTIONS_SIZE, activation="linear")(outputs)
+        model = tf.keras.Model(inputs=inputs, outputs=outputs)
+
+        model.compile(
+            loss="mse",
+            optimizer=Adam(lr=1e-5),
+            metrics=["accuracy"],
+        )
+
+        return model
 
     # リプレイバッファへの保存
     # (state, action, reward, new state, done)
