@@ -80,10 +80,10 @@ UPDATE_MODEL_EVERY_N_TRAININGS = 5  # Terminal states (end of episodes)
 # EPSILON_DECAY = 0.9993
 # 2 hours process
 # EPISODES = 1500
-# EPSILON_DECAY = 0.998
+EPSILON_DECAY = 0.998
 # 30 mins process
 EPISODES = 150
-EPSILON_DECAY = 0.98
+# EPSILON_DECAY = 0.98
 # EPISODES = 10_000
 epsilon = 1  # not a constant, going to be decayed
 MIN_EPSILON = 0.001
@@ -371,7 +371,7 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
     return best_action_int
 
 
-def self_learning(agent, metrix_writer):
+def self_learning(agent, metrix_writer, num_episode):
  
   global epsilon
   env = CatanEnvironment()
@@ -379,7 +379,7 @@ def self_learning(agent, metrix_writer):
   # For stats
   ep_rewards = []
 
-  for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit="episodes"):
+  for episode in tqdm(range(1, num_episode + 1), ascii=True, unit="episodes"):
 
     # Restarting episode - reset episode reward and step number
     episode_reward = 0
@@ -498,7 +498,7 @@ def main(experiment_name, base_model, play_data_path, episode, validation_step):
     if play_data_path is not None:
       agent = teacher_learning(agent, writer, play_data_path, validation_step)
     else:
-      agent = self_learning(agent, writer)
+      agent = self_learning(agent, writer, episode)
     # Iterate over episodes
 
 

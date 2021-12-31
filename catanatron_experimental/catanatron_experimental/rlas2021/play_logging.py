@@ -39,10 +39,11 @@ def generate_log_callback(play_log_directory):
     record.player = action.color
     record.status = extract_status(game, action.color)
     record.status["Game"] = str(game.id)
+    record.status["PLAYER"] = str(action.color)
 
     record.action = extract_actions(game, action)
     record.action["Game"] = str(game.id)
-    record.action["Player"] = str(action.color)
+    record.action["PLAYER"] = str(action.color)
 
     record.reward["Game"] = str(game.id)
     record.reward["PLAYER"]   = action.color
