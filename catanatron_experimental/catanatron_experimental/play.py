@@ -94,7 +94,7 @@ PLAYER_CLASSES = {
     "P": PRLPlayer,
     "T": TensorRLPlayer,
     "D": DQNPlayer,
-    "RLAS": RLASDQNPlayer,
+    "L": RLASDQNPlayer,
 }
 
 
