@@ -16,7 +16,6 @@ from catanatron.models.enums import Action
 
 def player_features(game: Game, p_color):
   features = dict()
-  features["PLAYER"] = p_color
 
   for i, color in iter_players(game.state.colors, p_color):
     key = player_key(game.state, color)
@@ -134,5 +133,5 @@ def get_feature_size():
       SimplePlayer(Color.ORANGE),
   ]
   game = Game(players)
-  record = extract_status(game)
+  record = extract_status(game, players[0].color)
   return len(record)

@@ -32,7 +32,9 @@ from catanatron_experimental.machine_learning.players.minimax import (
     AlphaBetaPlayer,
     ValueFunctionPlayer,
 )
-
+from catanatron.state_functions import (
+    player_key
+)
 from catanatron_experimental.rlas2021.features import (
     extract_status, 
     status_vector,
@@ -43,7 +45,12 @@ from catanatron_server.utils import ensure_link
 from catanatron_experimental.rlas2021.rlas_catan_env import (
     index_to_action,
     action_to_index,
-    get_actions_size,
+)
+from catanatron_gym.envs.catanatron_env import (
+    ACTIONS_ARRAY,
+    ACTION_SPACE_SIZE,
+    from_action_space,
+    to_action_space,
 )
 from catanatron.models.map import BaseMap
 
@@ -106,12 +113,12 @@ SHOW_PREVIEW = False
 # Num Roads
 
 FEATURES_SIZE = get_feature_size()
-ACTIONS_SIZE = get_actions_size()
+ACTIONS_SIZE = ACTION_SPACE_SIZE# get_actions_size()
 
 class RLASDQNPlayer(Player):
     def __init__(self, color, model_path):
         super(RLASDQNPlayer, self).__init__(color)
-        self.model = model = tf.keras.models.load_model(model_path)   
+        self.model = tf.keras.models.load_model(model_path)   
 
     def decide(self, game, playable_actions):
         # 選択肢がひとつのときはそれをする
@@ -122,7 +129,7 @@ class RLASDQNPlayer(Player):
         sample = status_vector(game, self.color)
         sample = tf.reshape(tf.convert_to_tensor(sample), (-1, FEATURES_SIZE))
         # get estimated q value
-        qs = DQN_MODEL.call(sample)[0]
+        qs = self.model.call(sample)[0]
 
         best_action_int = epsilon_greedy_policy(playable_actions, qs, 0.05)
         best_action = index_to_action(best_action_int, playable_actions)
@@ -183,7 +190,7 @@ class CatanEnvironment:
 
         key = player_key(self.game.state, action.color)
         points = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"]
-        reward = int(winning_color == self.p0.color) * 10 * 1000 + points
+        reward = int(winning_color == action.color) * 10 * 1000 + points
         if winning_color is None:
             reward = 0
         else:
@@ -204,7 +211,7 @@ class CatanEnvironment:
 
     def _get_state(self):
         current_player_color = self.game.state.current_player().color
-        sample = extract_status(self.game, current_player_color)
+        sample = status_vector(self.game, current_player_color)
 
         return (sample, None)  # NOTE: each observation/state is a tuple.
 
@@ -343,7 +350,7 @@ class RLASAgent:
 def epsilon_greedy_policy(playable_actions, qs, epsilon):
     if np.random.random() > epsilon:
         # create mask list, 1 if playable else 0
-        action_ints = list(map(action_to_index, playable_actions))
+        action_ints = list(map(to_action_space, playable_actions))
         mask = np.zeros(ACTIONS_SIZE, dtype=np.int)
         mask[action_ints] = 1
 
@@ -355,7 +362,7 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
         # Get random action
         index = random.randrange(0, len(playable_actions))
         best_action = playable_actions[index]
-        best_action_int = action_to_index(best_action)
+        best_action_int = to_action_space(best_action)
 
     return best_action_int
 
@@ -424,13 +431,13 @@ def self_learning(agent, metrix_writer):
 
   return agent
 
-def teacher_learning(agent, writer, play_data, validation_step):
+def teacher_learning(agent, writer, play_data_path, validation_step):
 
-  num_samples = estimate_num_samples(play_data)
+  num_samples = estimate_num_samples(play_data_path)
   print("Number of samples =", num_samples)
 
   agent.model.fit(
-    generate_arrays_from_file(play_data, MINIBATCH_SIZE, "VICTORY_POINTS_RETURN", "P"),
+    generate_arrays_from_file(play_data_path, MINIBATCH_SIZE, "VICTORY_POINTS_RETURN", "P"),
     epochs=1,
     steps_per_epoch = num_samples / MINIBATCH_SIZE,
   )
@@ -442,7 +449,7 @@ def teacher_learning(agent, writer, play_data, validation_step):
 @click.argument("experiment_name")
 @click.option(
   "-d",
-  "--play-data",
+  "--play-data-path",
   default=None,
   help="Teacher data path. if empty self-learning",
 )
@@ -457,7 +464,7 @@ def teacher_learning(agent, writer, play_data, validation_step):
   default=100,
   help=""
 )
-def main(experiment_name, play_data, episode, validation_step):
+def main(experiment_name, play_data_path, episode, validation_step):
 
     # For more repetitive results
     random.seed(4)
@@ -478,8 +485,8 @@ def main(experiment_name, play_data, episode, validation_step):
     print("Will be writing metrics to", metrics_path)
     print("Will be saving model to", output_model_path)
 
-    if (play_data):
-      agent = teacher_learning(agent, writer, play_data, validation_step)
+    if play_data_path is not None:
+      agent = teacher_learning(agent, writer, play_data_path, validation_step)
     else:
       agent = self_learning(agent, writer)
     # Iterate over episodes
