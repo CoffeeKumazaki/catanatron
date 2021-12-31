@@ -22,6 +22,7 @@ ACTIONS_ARRAY = [
     *[(ActionType.BUILD_CITY, node_id) for node_id in range(NUM_NODES)],
     (ActionType.BUY_DEVELOPMENT_CARD, None),
     (ActionType.PLAY_KNIGHT_CARD, None),
+    (ActionType.PLAY_VICTORY_POINT, None),
     *[
         (ActionType.PLAY_YEAR_OF_PLENTY, (first_card, RESOURCE_LIST[j]))
         for i, first_card in enumerate(RESOURCE_LIST)
