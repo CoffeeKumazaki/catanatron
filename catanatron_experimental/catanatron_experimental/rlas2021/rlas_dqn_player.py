@@ -132,7 +132,7 @@ class RLASDQNPlayer(Player):
         qs = self.model.call(sample)[0]
 
         best_action_int = epsilon_greedy_policy(playable_actions, qs, 0.05)
-        best_action = index_to_action(best_action_int, playable_actions)
+        best_action = from_action_space(best_action_int, playable_actions)
         return best_action
 
 BOT_CLASSES = [
@@ -225,13 +225,17 @@ class CatanEnvironment:
 
 # Agent class
 class RLASAgent:
-    def __init__(self):
-        # Main model
-        self.model = self.create_model()
+    def __init__(self, model_path):
+        if model_path is not None:
+            self.model = tf.keras.models.load_model(model_path)
+            self.target_model = tf.keras.models.load_model(model_path)
+        else:
+            # Main model
+            self.model = self.create_model()
 
-        # Target network
-        self.target_model = self.create_model()
-        self.target_model.set_weights(self.model.get_weights())
+            # Target network
+            self.target_model = self.create_model()
+            self.target_model.set_weights(self.model.get_weights())
 
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
@@ -448,6 +452,12 @@ def teacher_learning(agent, writer, play_data_path, validation_step):
 @click.command()
 @click.argument("experiment_name")
 @click.option(
+    "-m",
+    "--base-model",
+    default=None,
+    help="Base model path",
+)
+@click.option(
   "-d",
   "--play-data-path",
   default=None,
@@ -464,12 +474,12 @@ def teacher_learning(agent, writer, play_data_path, validation_step):
   default=100,
   help=""
 )
-def main(experiment_name, play_data_path, episode, validation_step):
+def main(experiment_name, base_model, play_data_path, episode, validation_step):
 
     # For more repetitive results
-    random.seed(4)
-    np.random.seed(4)
-    tf.random.set_seed(4)
+    # random.seed(4)
+    # np.random.seed(4)
+    # tf.random.set_seed(4)
 
     # Ensure models folder
     model_name = f"{experiment_name}-{int(time.time())}"
@@ -477,7 +487,7 @@ def main(experiment_name, play_data_path, episode, validation_step):
     if not os.path.isdir(models_folder):
         os.makedirs(models_folder)
 
-    agent = RLASAgent()
+    agent = RLASAgent(base_model)
     agent.model.summary()
     metrics_path = f"data/logs/catan-dql/{model_name}"
     output_model_path = models_folder + model_name
