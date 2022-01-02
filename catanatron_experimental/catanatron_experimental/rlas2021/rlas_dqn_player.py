@@ -258,7 +258,7 @@ class RLASAgent:
 
         model.compile(
             loss="mse",
-            optimizer=Adam(lr=1e-5),
+            optimizer=Adam(lr=1e-2),
             metrics=["accuracy"],
         )
 
