@@ -65,7 +65,7 @@ DISCOUNT = 0.9
 # Every 5 episodes we have ~MINIBATCH_SIZE=1024 samples.
 # With batch-size=16k we are likely to hit 1 sample per action(?)
 REPLAY_MEMORY_SIZE = 50_000  # How many last steps to keep for model training
-MIN_REPLAY_MEMORY_SIZE = 5_000  # Min number of steps in a memory to start training
+MIN_REPLAY_MEMORY_SIZE = 2_000  # Min number of steps in a memory to start training
 MINIBATCH_SIZE = 1024  # How many steps (samples) to use for training
 TRAIN_EVERY_N_EPISODES = 1
 TRAIN_EVERY_N_STEPS = 100  # catan steps / decisions by agent
@@ -77,10 +77,10 @@ UPDATE_MODEL_EVERY_N_TRAININGS = 5  # Terminal states (end of episodes)
 # EPSILON_DECAY = 0.99975
 # 8 hours process
 # EPISODES = 6000
-# EPSILON_DECAY = 0.9993
+EPSILON_DECAY = 0.9993
 # 2 hours process
 # EPISODES = 1500
-EPSILON_DECAY = 0.998
+# EPSILON_DECAY = 0.998
 # 30 mins process
 EPISODES = 150
 # EPSILON_DECAY = 0.98
@@ -191,10 +191,10 @@ class CatanEnvironment:
         key = player_key(self.game.state, action.color)
         points = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"]
         reward = int(winning_color == action.color) * 10 * 1000 + points
-        if winning_color is None:
-            reward = 0
-        else:
-            reward = 1
+        #if winning_color is None:
+        #    reward = 0
+        #else:
+        #    reward = 1
 
         done = winning_color is not None or self.game.state.num_turns > 500
         return new_state, reward, done
@@ -404,7 +404,7 @@ def self_learning(agent, metrix_writer, num_episode):
 
         # 行動をバッファに登録
         # 選択肢がないときは学習しなくていい
-        if len(env.playable_actions()) > 1:
+        if len(env.playable_actions()) > 1 and best_action_int != ACTION_SPACE_SIZE-1 and best_action_int != 0:
           agent.update_replay_memory(
               (current_state, best_action_int, reward, new_state, done)
           )
