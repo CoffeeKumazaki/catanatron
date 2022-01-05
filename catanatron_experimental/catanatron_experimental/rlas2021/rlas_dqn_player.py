@@ -7,6 +7,7 @@ import click
 from collections import Counter, deque
 
 import numpy as np
+np.set_printoptions(linewidth=np.inf)
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (
     Dense,
@@ -133,6 +134,7 @@ class RLASDQNPlayer(Player):
 
         best_action_int = epsilon_greedy_policy(playable_actions, qs, 0.05)
         best_action = from_action_space(best_action_int, playable_actions)
+        # print(best_action_int, best_action)
         return best_action
 
 BOT_CLASSES = [
@@ -182,15 +184,17 @@ class CatanEnvironment:
 
     def step(self, action_int):
         action = from_action_space(action_int, self.playable_actions())
+        key = player_key(self.game.state, action.color)
+        ppoint = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"]
+
         self.game.execute(action)
 
         winning_color = self.game.winning_color()
 
         new_state = self._get_state()
 
-        key = player_key(self.game.state, action.color)
-        points = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"]
-        reward = int(winning_color == action.color) * 10 * 1000 + points
+        reward = self.game.state.player_state[f"{key}_ACTUAL_VICTORY_POINTS"] - ppoint
+        # reward = int(winning_color == action.color) * 10 * 1000 + points
         #if winning_color is None:
         #    reward = 0
         #else:
@@ -258,7 +262,7 @@ class RLASAgent:
 
         model.compile(
             loss="mse",
-            optimizer=Adam(lr=1e-2),
+            optimizer=Adam(lr=1e-3),
             metrics=["accuracy"],
         )
 
@@ -362,6 +366,8 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
         clipped_probas[clipped_probas == 0] = -np.inf
 
         best_action_int = np.argmax(clipped_probas)
+        # print(qs.numpy())
+        # print(clipped_probas)
     else:
         # Get random action
         index = random.randrange(0, len(playable_actions))
@@ -371,7 +377,7 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
     return best_action_int
 
 
-def self_learning(agent, metrix_writer, num_episode):
+def self_learning(agent, metrix_writer, num_episode, output_model_path):
  
   global epsilon
   env = CatanEnvironment()
@@ -432,6 +438,10 @@ def self_learning(agent, metrix_writer, num_episode):
     if epsilon > MIN_EPSILON:
         epsilon *= EPSILON_DECAY
         epsilon = max(MIN_EPSILON, epsilon)
+
+    if episode % 100 == 0:
+        print("Saving model to", output_model_path, "at ", episode)
+        agent.model.save(output_model_path + "-" + '{:04}'.format(episode))
 
   return agent
 
@@ -498,9 +508,7 @@ def main(experiment_name, base_model, play_data_path, episode, validation_step):
     if play_data_path is not None:
       agent = teacher_learning(agent, writer, play_data_path, validation_step)
     else:
-      agent = self_learning(agent, writer, episode)
-    # Iterate over episodes
-
+      agent = self_learning(agent, writer, episode, output_model_path)
 
     print("Saving model to", output_model_path)
     agent.model.save(output_model_path)
