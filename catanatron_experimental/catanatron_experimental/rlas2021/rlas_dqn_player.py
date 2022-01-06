@@ -247,6 +247,9 @@ class RLASAgent:
         # Used to count when to update target network with main network's weights
         self.target_update_counter = 0
 
+        # 
+        self.playable_action_mask = {}
+
     def create_model(self):
         
         inputs = tf.keras.Input(shape=(FEATURES_SIZE,))
@@ -269,15 +272,16 @@ class RLASAgent:
         return model
 
     # リプレイバッファへの保存
-    # (state, action, reward, new state, done)
-    def update_replay_memory(self, transition):
+    # transitionn = (state, action, reward, new state, done)
+    def update_replay_memory(self, transition, mask):
         self.replay_memory.append(transition)
+        self.playable_action_mask[tuple(transition[3][0])] = mask
 
     # 学習
     def train(self, terminal_state):
         # データ数が MIN_REPLAY_MEMORY_SIZE より少なかったら学習しない
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
-            print("Not enough training data", len(self.replay_memory), MINIBATCH_SIZE)
+            print("Not enough training data", len(self.replay_memory), MIN_REPLAY_MEMORY_SIZE)
             return
 
         # リプレイバッファからランダムにサンプルを取得
@@ -294,6 +298,8 @@ class RLASAgent:
         # 次状態のQ値のリスト
         # 注:ターゲットネットワークから取る
         future_qs_list = self.target_model.call(new_current_states).numpy()
+        state_tuple = tuple(new_current_states.numpy()[0])
+        future_qs_list = np.multiply(self.playable_action_mask[state_tuple], future_qs_list)
 
         # 学習データ
         # X: 現在の状態
@@ -413,9 +419,13 @@ def self_learning(agent, metrix_writer, num_episode, output_model_path):
         # 行動をバッファに登録
         # 選択肢がないときは学習しなくていい
         if len(env.playable_actions()) > 1 and best_action_int != ACTION_SPACE_SIZE-1 and best_action_int != 0:
-          agent.update_replay_memory(
-              (current_state, best_action_int, reward, new_state, done)
-          )
+            action_ints = list(map(to_action_space, env.playable_actions()))
+            mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.int)
+            mask[action_ints] = 1
+
+            agent.update_replay_memory(
+                (current_state, best_action_int, reward, new_state, done), mask
+            )
 
         if step % TRAIN_EVERY_N_STEPS == 0:
             agent.train(done)
