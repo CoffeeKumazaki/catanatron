@@ -262,7 +262,7 @@ class RLASAgent:
 
         model.compile(
             loss="mse",
-            optimizer=Adam(lr=1e-3),
+            optimizer=Adam(learning_rate=1e-5),
             metrics=["accuracy"],
         )
 
@@ -366,7 +366,9 @@ def epsilon_greedy_policy(playable_actions, qs, epsilon):
         clipped_probas[clipped_probas == 0] = -np.inf
 
         best_action_int = np.argmax(clipped_probas)
-        # print(qs.numpy())
+        # with open("/app/qs.log", 'a') as f:
+            # qs.numpy().tofile(f, sep=',')
+            # np.savetxt(f, [qs.numpy()], delimiter=',')
         # print(clipped_probas)
     else:
         # Get random action
